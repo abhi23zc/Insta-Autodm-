@@ -1,8 +1,10 @@
 node_modules
 .next
 .git
-.env
-.env.local
+.env*
+backups
+docker-compose.override.yml
+Caddyfile.local
 __tests__
 docs
 *.md

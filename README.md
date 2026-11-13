@@ -2,6 +2,8 @@
 
 # OpenReply
 
+**Insta-Autodm- deployment:** This fork includes a VPS Docker stack with HTTPS, PostgreSQL, Redis, a worker, and scheduled jobs. See [VPS deployment](docs/deploy-vps.md).
+
 Open-sourced ManyChat for Instagram comment-to-DM automation.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)

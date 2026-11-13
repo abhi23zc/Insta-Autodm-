@@ -1,0 +1,122 @@
+name: insta-autodm
+
+x-app: &app
+  image: ${APP_IMAGE:-insta-autodm:local}
+  build: .
+  restart: unless-stopped
+  init: true
+  env_file: ${VPS_ENV_FILE:-.env.vps}
+  environment: &app-env
+    NODE_ENV: production
+    DATABASE_URL: postgresql://openreply:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.vps}@postgres:5432/openreply
+    REDIS_URL: redis://redis:6379
+    NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in .env.vps}
+    NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in .env.vps}
+    ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env.vps}
+    CRON_SECRET: ${CRON_SECRET:?Set CRON_SECRET in .env.vps}
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openreply
+      POSTGRES_USER: openreply
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.vps}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openreply -d openreply"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["npm", "run", "db:migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    ports:
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # This readiness check must not depend on the worker: the worker waits for web.
+      test: ["CMD", "node", "scripts/container-health.mjs", "web"]
+      interval: 15s
+      timeout: 10s
+      start_period: 30s
+      retries: 10
+
+  worker:
+    <<: *app
+    command: ["npm", "run", "worker"]
+    stop_grace_period: 60s
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "scripts/container-health.mjs", "worker"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 4
+
+  cron:
+    <<: *app
+    command: ["sh", "scripts/cron.sh"]
+    environment:
+      <<: *app-env
+      CRON_BASE_URL: http://web:3000
+    depends_on:
+      web:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["https"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.vps}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  caddydata:
+  caddyconfig:

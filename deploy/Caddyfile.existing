@@ -1,0 +1,6 @@
+# Add this site block to the VPS's existing host Caddyfile.
+# If Caddy runs in Docker, join the application's network and use web:3000.
+autodm.webifyit.in {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3107
+}
