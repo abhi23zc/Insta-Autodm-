@@ -3,6 +3,7 @@ node_modules
 .git
 .env*
 backups
+*.dump
 docker-compose.override.yml
 Caddyfile.local
 __tests__

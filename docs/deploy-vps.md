@@ -4,6 +4,18 @@ Production domain: **autodm.webifyit.in**. This deployment runs independently of
 
 This VPS uses its existing host Caddy and loopback port 3107. Use `sh scripts/deploy-vps.sh existing-proxy` when updating this installation.
 
+## Installed state
+
+- Checkout: `/opt/insta-autodm` on the VPS; Compose project: `insta-autodm`.
+- App, worker, cron, PostgreSQL, and Redis are running. Docker is enabled at boot.
+- The original Mac users, Instagram connection, campaign, delivery logs, and Redis job/deduplication state were migrated. The Mac has no running OpenReply web app or worker after cutover.
+- The existing host Caddy routes this domain to `127.0.0.1:3107`; all previous site blocks were preserved. Its pre-change configuration was backed up under `/etc/caddy/Caddyfile.before-autodm-*`.
+- Zernio's existing webhook now targets the permanent domain; a signed public diagnostic request returned HTTP 200. A fresh Instagram comment is still needed to verify a newly generated provider event end to end.
+- Production Gmail magic-link submission was verified in Safari and reached the email verification page.
+- Daily database/environment backups run at 02:17 in the server's time zone through `/etc/cron.d/insta-autodm-backup`. Backups are stored in `/opt/insta-autodm/backups`; a manual backup was tested successfully. Copy them off-server as well.
+- One migrated comment job exhausted its attempts with Zernio HTTP 400. Its public reply was sent, but its DM failed; the delivery record is retained. This is not cleared or falsely marked successful by deployment.
+- GitHub CI, the final Docker build, TypeScript, and 365 tests passed. ESLint has zero errors and one existing navigation warning. All production health checks are healthy.
+
 ## Requirements
 
 - A Linux VPS with Docker Engine and Docker Compose v2, SSH access, and enough memory to build Next.js (4 GB RAM recommended for this stack).
