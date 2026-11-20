@@ -1,8 +1,9 @@
-import { EMAIL_PROVIDER_ID, signIn } from "@/lib/auth";
+import { EMAIL_PROVIDER_ID, auth, signIn } from "@/lib/auth";
 import { getI18n } from "@/lib/i18n/server";
 import { getCampaignTemplate } from "@/lib/templates/campaign-templates";
 import { DemoNotice } from "@/components/demo-notice";
 import { isPublicDemoHost } from "@/lib/env";
+import { redirect } from "next/navigation";
 
 const GITHUB_URL = "https://github.com/diwenne/openreply";
 const SETUP_DOCS_URL = `${GITHUB_URL}/blob/main/docs/setup.md`;
@@ -54,6 +55,16 @@ export default async function LoginPage({
   }
 
   const params = await searchParams;
+
+  // Redirect only when the session is actually valid. Checking for the cookie's
+  // presence (here or in middleware) loops forever on a stale/expired cookie:
+  // /login -> /dashboard -> /login. auth() resolves the database session, so an
+  // invalid cookie falls through to the sign-in form instead.
+  const session = await auth();
+  if (session?.user?.id) {
+    redirect("/dashboard");
+  }
+
   const checkEmail = params.checkEmail === "1";
   const selectedTemplate = getCampaignTemplate(params.template);
   const templateCallbackUrl = selectedTemplate
